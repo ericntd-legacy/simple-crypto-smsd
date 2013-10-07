@@ -1,0 +1,264 @@
+<?php
+function getKeys($size = 2048) {
+	$keyArr = array();
+
+	$pubKey = "";
+	$privKey = "";
+	
+	// attempt to retrive existing private key
+	$privateKeyFile = "private.pem";
+	
+	if(file_exists($privateKeyFile)) {
+		$privFH = fopen($privateKeyFile, "r");
+		if (!$privFH) {
+			echo "can't open $privateKeyFile \n";
+			//resetKeys();
+		} else {
+			if (filesize($privateKeyFile)>0) {
+				$privKey = fread($privFH, filesize($privateKeyFile));
+				fclose($privFH);
+	
+				if (!$privKey) {
+					echo "Private key is null how is that possible? \n";
+					//resetKeys();
+		
+				} else {
+					echo "private key found \n";
+				}
+			} else {
+				echo "somehow $privateKeyFile is empty";
+				//resetKeys();
+			}
+		}
+
+	} else {
+		echo "$privateKeyFile does not exist";
+	}
+	
+	// attempt to retrive existing public key
+	$publicKeyFile = "public.key"; // supposed to contain "[encodedModulus] [encodedExponent]"
+	
+	if (file_exists($publicKeyFile)) {
+		$pubFH = fopen($publicKeyFile, "r");
+		if ($pubFH) {
+			if (filesize($publicKeyFile)>0) {
+				$pubKey = fread($pubFH, filesize($publicKeyFile));
+				fclose($pubFH);
+
+				if (!$pubKey) {
+					echo "Public key is null how is that possible? \n";
+					//resetKeys();
+				} else {
+					echo "public key found \n";
+				
+				}
+			} else {
+				echo "somehow $publicKeyFile is empty";
+				//resetKeys();
+			}
+		} else {
+			echo "could not open $publicKeyFile \n";
+			// will need to generate public key from private key
+			//resetKeys();
+		}
+	} else {
+		echo "public.key does not exist";
+        }
+
+        $publicPem = readKeyFromFile("public.pem");
+
+	if (!empty($pubKey)&&!empty($privKey))  {
+		//$data = 'plaintext data goes here';
+
+		// Encrypt the data to $encrypted using the public key
+		//openssl_public_encrypt($data, $encrypted, $pubKey);
+		//echo $encrypted;
+		//echo "\n";
+
+		// Decrypt the data using the private key and store the results in $decrypted
+		//openssl_private_decrypt($encrypted, $decrypted, $privKey);
+
+		//echo $decrypted;
+		$keyArr["privatekey"] = $privKey;
+                $keyArr["publickey"] = $pubKey;
+                $keyArr["publicPem"] = $publicPem;
+		return $keyArr;	
+	} else {
+		echo "couldnt get keys, nothing done \n";
+		return resetKeys($size);
+	}
+}
+
+function getPrivateKey() {
+}
+function getPublicKey() {
+	
+}
+function encrypt($message) {
+}
+
+function decrypt($message, $size = 2048) {
+	$result = "";
+	
+	// Base64 decode the message
+	$decoded = base64_decode($message);
+	$result .= "decoded $decoded \n";
+	
+	// decrypt the message
+	if ($decoded) {
+	} else {
+		$result .= "failed to decode";
+		return $result; // point of failure #1
+	}
+	
+	$keyArr = array();
+	$keyArr = getKeys($size);
+		
+	if ($keyArr) {
+		$privateKey = $keyArr["private"];
+		$tmp = openssl_private_decrypt(base64_decode($message), $decrypted, $privateKey, OPENSSL_PKCS1_PADDING);
+		
+	  while ($errorMsg = openssl_error_string()) {
+                $result .=  "error: $errorMsg \n";
+                //echo "$msg\n";
+          }
+       	
+       	  if ($tmp) {
+       		$result = $decrypted;
+       		return $result; // point of success
+       	  } else {
+       		$result .= "failed to decrypt";
+       		return $result; // point of failure #2
+       	  }
+   	}
+	
+	return $result;
+}
+
+function resetKeys($size = 2048) {
+	$keyArr = array();
+	echo "trying to generate keys \n";
+	$config = array(
+		//"digest_alg" => "sha512",
+		"private_key_bits" => $size,
+		"private_key_type" => OPENSSL_KEYTYPE_RSA,
+	);
+	
+	// Create the private and public key
+	$res = openssl_pkey_new($config);
+
+	// Extract the private key from $res to $privKey
+	openssl_pkey_export($res, $privKey);
+	// save the private key to a text file
+	$successful = openssl_pkey_export_to_file($res, "private.pem");
+	echo "successfully generated private key and save it to private.pem $successful - $privKey \n";
+
+	// Extract the public key from $res to $pubKey
+	$keyDetails = openssl_pkey_get_details($res);
+        $pubKey = $keyDetails["key"];
+        // save the pem public key to public.pem anyway, in case i need it
+        saveKeyToFile($pubKey, "public.pem");
+	$pubKeyMod = $keyDetails["rsa"]["n"];
+	$pubKeyExp = $keyDetails["rsa"]["e"];
+	echo "Public key modulus: $pubKeyMod \n and public key exponent $pubKeyExp \n";
+	
+	// save the private key to a text file
+	/*$publicKeyFile = "public.pem";
+	$fh = fopen($publicKeyFile, 'w+');
+	$stringData = $pubKey;
+	fwrite($fh, $stringData);
+	fclose($fh);
+	echo "successfully generated private key and save it to public.pem - "+$pubKey+ " \n";*/
+	
+	// TODO encode public modulus and exponent using base64 and then save them to a text file
+	$encodedPubKeyMod = base64_encode($pubKeyMod);
+	$encodedPubKeyExp = base64_encode($pubKeyExp);
+	$publicKeyStr = $encodedPubKeyMod." ".$encodedPubKeyExp;
+	$publicKeyFile = "public.key";
+	
+	// Let's make sure the file exists and is writable first.
+	//if (is_writable($publicKeyFile)) {
+
+		// In our example we're opening $filename in append mode.
+		// The file pointer is at the bottom of the file hence
+		// that's where $somecontent will go when we fwrite() it.
+		if (!$handle = fopen($publicKeyFile, 'w+')) {
+		     echo "Cannot open file ($publicKeyFile)";
+		     exit;
+		}
+
+		// Write $somecontent to our opened file.
+		if (fwrite($handle, $publicKeyStr) === FALSE) {
+		    echo "Cannot write to file ($publicKeyFile)";
+		    exit;
+		}
+
+		echo "Success, wrote ($publicKeyStr) to file ($publicKeyFile) \n";
+
+		fclose($handle);
+
+	//} else {
+	//	echo "The file $publicKeyFile is not writable";
+	//}
+	
+	/*$fh = fopen($publicKeyFile, 'w+');
+	if ($fh) { 
+		$publicKeyStr = $encodedPubKeyMod." ".$encodedPubKeyExp; echo $publicKeyStr;
+		fwrite($fh, $stringData);
+		
+		fclose($fh);
+	} else {
+		echo("could not open public.key");
+	}*/
+	
+	if (!empty($pubKey)&&!empty($privKey))  {
+		;/*$data = 'plaintext data goes here';
+
+		// Encrypt the data to $encrypted using the public key
+		openssl_public_encrypt($data, $encrypted, $pubKey);
+		echo $encrypted;
+		echo "\n";
+
+		// Decrypt the data using the private key and store the results in $decrypted
+		openssl_private_decrypt($encrypted, $decrypted, $privKey);
+
+		echo $decrypted;*/
+		$keyArr["privatekey"] = $privKey;
+                $keyArr["publickey"] = $publicKeyStr;
+                $keyArr["publicPem"] = $pubKey;
+		return $keyArr;
+	} else {
+		echo "couldnt reset keys, nothing done \n";
+		return false;
+	}
+}
+
+function saveKeyToFile($keyStr, $keyFileName) {
+    if (!$handle = fopen($keyFileName, 'w+')) {
+               echo "Cannot open file ($keyFileName)";
+                       exit;
+                  }
+
+        // Write $somecontent to our opened file.
+    if (fwrite($handle, $keyStr) === FALSE) {
+      echo "Cannot write to file ($keyFileName)";
+      exit;
+    }
+    echo "Success, wrote ($keyStr) to file ($keyFileName) \n";
+    
+    fclose($handle);
+}
+
+function readKeyFromFile($keyFileName) {
+  $result = "";
+  if (!$handle = fopen($keyFileName, 'r')) {
+    echo "Cannot open file ($keyFileName)";
+    return $result;
+    exit;
+  }
+
+  $result = fread($handle, filesize($keyFileName));
+  fclose($handle);
+  return $result;
+}
+?>
