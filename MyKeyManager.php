@@ -1,5 +1,6 @@
 <?php
 include('/home/gmsntd/crypto/MyKeyUtils.php');
+include('/home/gmsntd/crypto/SmsSender.php');
 
 $phoneNo = "+6596147928";
 
@@ -22,7 +23,10 @@ $keyXMsg = "keyx $modBase64Encoded $expBase64Encoded";
 $msgLen = strlen($keyXMsg);
 echo "key exchange message length: $msgLen and message is: $keyXMsg \n";
 
-$encrypted = encrypt("etst message", 128);
+//echo sendSMS($phoneNo, $keyXMsg);
+//echo sendKeyExchange($phoneNo, $modBase256, $expBase256);
+
+/*$encrypted = encrypt("etst message", 128);
 
 $decrypted = decrypt($encrypted, 128);
 echo "decrypted: $decrypted \n";
@@ -33,5 +37,5 @@ echo "executing command: $command \n";
 $output = "";
 passthru($command, $output);
 echo $output;
-
+ */
 ?>
